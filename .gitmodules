@@ -1,0 +1,6 @@
+[submodule "mcp/freesound-mcp-server"]
+	path = mcp/freesound-mcp-server
+	url = https://github.com/audio-research-projects/freesound-mcp-server
+[submodule "mcp/redpanal-mcp-server"]
+	path = mcp/redpanal-mcp-server
+	url = https://github.com/audio-research-projects/redpanal-mcp-server
