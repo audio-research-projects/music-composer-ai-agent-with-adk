@@ -1,4 +1,5 @@
 .venv/
+.adk/
 
 # Local env (API keys, secrets). No commitear.
 .env
