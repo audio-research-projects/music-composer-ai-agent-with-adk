@@ -12,21 +12,29 @@ from google.adk.agents.llm_agent import LlmAgent
 
 from .config import MODEL
 from .instructions import COORDINADOR_INSTRUCTION
-from .subagents import create_compositor, create_musica_concreta_expert
+from .intent_state import update_intent_state
+from .subagents import (
+    create_compositor,
+    create_folclore_argentino_expert,
+    create_musica_concreta_expert,
+    create_prompt_builder,
+)
 
 
 def create_root_agent() -> LlmAgent:
-    """Agente raíz tipo router: recomienda subagentes y delega con transfer_to_agent."""
+    """Agente raíz: pregunta BPM y estilo, delega al experto y el flujo termina en PromptBuilder (Suno)."""
     compositor = create_compositor()
+    folclore_argentino_expert = create_folclore_argentino_expert()
     musica_concreta_expert = create_musica_concreta_expert()
+    prompt_builder = create_prompt_builder()
 
     return LlmAgent(
         name="CoordinadorAudio",
         model=MODEL,
-        description="Coordinador de expertos en composición sonora: recomienda y delega a subagentes especializados (Compositor para búsqueda y composición, MusicaConcretaExpert para definir paletas sonoras).",
+        description="Coordinador de expertos en composición sonora: pregunta BPM y estilo musical, deriva a FolcloreArgentinoExpert, MusicaConcretaExpert o Compositor, y el flujo termina en PromptBuilder para generar el prompt para Suno desde plantillas.",
         instruction=COORDINADOR_INSTRUCTION,
-        tools=[],
-        sub_agents=[compositor, musica_concreta_expert],
+        tools=[update_intent_state],
+        sub_agents=[folclore_argentino_expert, musica_concreta_expert, compositor, prompt_builder],
     )
 
 
