@@ -1,16 +1,17 @@
 # Audio Compositor ADK
 
-Agente para **componer una obra sonora a partir de un prompt**, construido con **Google Agent Development Kit (ADK)**. Usa herramientas MCP (Model Context Protocol) de **Freesound** y **RedPanal** directamente como tools del agente raíz.
-
-Dale al agente una descripción (por ejemplo: "una pieza de 2 minutos, ambiente lluvia y cuerdas, intro suave y climax al final") y buscará sonidos en ambas bases, los seleccionará y te entregará una composición ordenada (lista de sonidos, tiempos sugeridos y, si lo pides, código Supercollider o descripción para DAW).
+Sistema multi-agente para **componer obras sonoras** y **generar prompts para Suno/Ace**, construido con **Google Agent Development Kit (ADK)**. El agente raíz (**CoordinadorAudio**) pregunta BPM y estilo musical, deriva a expertos especializados y puede cerrar el flujo con el **PromptBuilder**, que crea prompts desde plantillas indexadas. Usa herramientas MCP de **Freesound** y **RedPanal**, además de tools propias para el **session state**.
 
 ## Estructura del proyecto
 
-- **agent.py** (raíz): define el agente AudioCompositor y `root_agent`.
-- **agents/audio_compositor/**: wrapper para ADK Web; importa `root_agent` desde la raíz para que `adk web agents` muestre solo este agente en el combo (y no docs, mcp, scripts).
-- **Freesound** (`freesound_mcp`) y **RedPanal** (`redpanal_mcp`): tools MCP usadas por el agente.
+- **agent.py** (raíz): importa `root_agent` desde `agents/coordinador_audio/`.
+- **agents/coordinador_audio/**: agente raíz (CoordinadorAudio) y subagentes (FolcloreArgentino, MusicaConcreta, Compositor, RemixAgent, OverdubAgent, PromptBuilder).
+- **Freesound** (`freesound_mcp`) y **RedPanal** (`redpanal_mcp`): tools MCP para búsqueda de sonidos.
+- **docs/AGENTS.md**: documentación de la estructura de agentes y manejo del session state.
 
-Los servidores MCP están en `mcp/` como **submodules** de Git; se bajan de sus repos al clonar o con `git submodule update --init --recursive`.
+Los servidores MCP están en `mcp/` como **submodules** de Git; se bajan con `git submodule update --init --recursive`.
+
+Para la arquitectura de agentes y el manejo del state, ver **[docs/AGENTS.md](docs/AGENTS.md)**.
 
 ## Requisitos
 
@@ -116,13 +117,29 @@ O usando el script (carga `.env` y lanza la web):
 
 **Si ves "Failed to create MCP session":** los servidores MCP (Freesound, RedPanal) se arrancan con `uv`. Ejecuta desde la raíz con `uv run adk web agents` (o `./scripts/run-web.sh`, que debería usar el mismo entorno). Comprueba que los submodules estén inicializados: `git submodule update --init --recursive`.
 
-El agente raíz (`root_agent`) está definido en `agent.py` y es el que ADK utiliza por defecto. Las variables de entorno (`.env`) se pasan a los servidores MCP vía `StdioServerParameters.env` para que Freesound y RedPanal reciban las API keys. Para detalle de las herramientas MCP, ver **[docs/TOOLS.md](docs/TOOLS.md)**. Documentación oficial de ADK: [Get started (Python)](https://google.github.io/adk-docs/get-started/python/), [MCP tools](https://google.github.io/adk-docs/tools-custom/mcp-tools/), [Multi-agent systems](https://google.github.io/adk-docs/agents/multi-agents/).
+El agente raíz (`root_agent`) está definido en `agent.py` y es el que ADK utiliza por defecto. Las variables de entorno (`.env`) se pasan a los servidores MCP vía `StdioServerParameters.env` para que Freesound y RedPanal reciban las API keys. Para detalle de las herramientas MCP, ver **[docs/TOOLS.md](docs/TOOLS.md)**. Para la estructura de agentes y el manejo del session state, ver **[docs/AGENTS.md](docs/AGENTS.md)**.
+
+Documentación oficial de ADK: [Get started (Python)](https://google.github.io/adk-docs/get-started/python/), [MCP tools](https://google.github.io/adk-docs/tools-custom/mcp-tools/), [Multi-agent systems](https://google.github.io/adk-docs/agents/multi-agents/), [Session state](https://google.github.io/adk-docs/sessions/state/).
+
+### Prompt templates (PromptBuilder)
+
+El subagente **PromptBuilder** crea prompts a partir de plantillas almacenadas en la carpeta `prompt_templates/`. Las plantillas se indexan en una base vectorial (Chroma); en tiempo de ejecución el agente **no** lee los archivos .txt, solo consulta el índice por similitud.
+
+- **Dónde poner plantillas:** archivos `.txt` en `prompt_templates/` (un ejemplo de prompt por archivo; el nombre del archivo se usa como referencia).
+- **Indexar después de añadir o editar plantillas:**
+  ```bash
+  uv run python -m scripts.index_prompt_templates
+  ```
+  Opcional: otro directorio con `--dir ruta/a/mis_plantillas`.
+- La base Chroma se guarda en `data/prompt_templates_db/` (está en `.gitignore`). Si no has ejecutado el script, PromptBuilder seguirá funcionando pero con la biblioteca vacía (solo la intención del usuario).
 
 ## Dependencias principales
 
 - [google-adk](https://github.com/google/adk) — Agent Development Kit
 - [mcp](https://modelcontextprotocol.io/) — Model Context Protocol para herramientas
 - [python-dotenv](https://pypi.org/project/python-dotenv/) — Carga de `.env`
+- [chromadb](https://www.trychroma.com/) — Base vectorial para plantillas de prompt
+- [sentence-transformers](https://www.sbert.net/) — Embeddings locales para indexar y buscar plantillas
 
 Ver `pyproject.toml` para versiones y más dependencias.
 
