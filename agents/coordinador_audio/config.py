@@ -35,6 +35,26 @@ MCP_DIR = BASE_DIR / "mcp"
 MCP_ENV_KEYS = ("FREESOUND_API_KEY", "REDPANAL_USER", "REDPANAL_PASSWORD", "GOOGLE_API_KEY")
 
 
+def freesound_mcp() -> McpToolset:
+    """MCP toolset for Freesound audio search."""
+    return mcp_toolset(MCP_DIR / "freesound-mcp-server", "mcp_freesound.py", "freesound")
+
+
+def redpanal_mcp() -> McpToolset:
+    """MCP toolset for RedPanal audio repository."""
+    return mcp_toolset(MCP_DIR / "redpanal-mcp-server", "mcp_redpanal.py", "redpanal")
+
+
+def ffmpeg_mcp() -> McpToolset:
+    """MCP toolset for FFmpeg audio/video processing."""
+    return mcp_toolset(MCP_DIR / "ffmpeg-mcp-server", "mcp_ffmpeg.py", "ffmpeg")
+
+
+def sox_mcp() -> McpToolset:
+    """MCP toolset for SoX audio effects and analysis."""
+    return mcp_toolset(MCP_DIR / "sox-mcp-server", "mcp_sox.py", "sox")
+
+
 def _mcp_env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if k in MCP_ENV_KEYS and v}
 

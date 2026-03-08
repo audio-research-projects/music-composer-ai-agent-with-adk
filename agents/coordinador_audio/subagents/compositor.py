@@ -3,7 +3,7 @@ from google.adk.agents.llm_agent import LlmAgent
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.tool_context import ToolContext
 
-from ..config import MCP_DIR, MODEL, mcp_toolset
+from ..config import MCP_DIR, MODEL, mcp_toolset, ffmpeg_mcp, sox_mcp
 from ..instructions import COMPOSITOR_INSTRUCTION
 
 
@@ -29,11 +29,13 @@ def create_compositor() -> LlmAgent:
         "mcp_redpanal.py",
         "redpanal_mcp",
     )
+    ffmpeg_tools = ffmpeg_mcp()
+    sox_tools = sox_mcp()
     return LlmAgent(
         name="Compositor",
         model=MODEL,
         description="Compositor sonoro: busca sonidos en Freesound y RedPanal, y crea obras completas con listas ordenadas de sonidos, tiempos sugeridos, y código Supercollider o descripciones para DAW.",
         instruction=COMPOSITOR_INSTRUCTION,
-        tools=[freesound, redpanal],
+        tools=[freesound, redpanal, ffmpeg_tools, sox_tools],
         on_tool_error_callback=_on_tool_error_cut_process,
     )

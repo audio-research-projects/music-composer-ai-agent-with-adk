@@ -1,0 +1,8 @@
+[project]
+name = "mcp-ffmpeg"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "mcp[cli]>=1.8.1",
+    "ffmpeg-python>=0.2.0",
+]
