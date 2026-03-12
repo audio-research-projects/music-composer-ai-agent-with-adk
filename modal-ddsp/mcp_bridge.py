@@ -26,15 +26,14 @@ mcp = FastMCP("ddsp-modal")
 MODAL_APP_NAME = os.environ.get("MODAL_APP_NAME", "ddsp-timbre-transfer")
 
 
-def _get_modal_app():
-    """Get reference to deployed Modal app."""
+def _get_function(name: str):
+    """Get a Modal function by name."""
     try:
-        # Lookup deployed app
-        app = modal.lookup(MODAL_APP_NAME)
-        return app
-    except Exception as e:
-        raise RuntimeError(f"Could not connect to Modal app '{MODAL_APP_NAME}'. "
-                          f"Make sure it's deployed: modal deploy modal_app.py. Error: {e}")
+        # Use newer API first
+        return modal.Function.from_name(MODAL_APP_NAME, name)
+    except Exception:
+        # Fallback
+        return modal.Function.lookup(MODAL_APP_NAME, name)
 
 
 @mcp.tool()
@@ -48,7 +47,7 @@ async def list_models() -> str:
         import json
         
         # Get the Modal function
-        f = modal.Function.lookup(MODAL_APP_NAME, "list_models")
+        f = _get_function("list_models")
         result = f.remote()
         
         return json.dumps(result, indent=2)
@@ -72,7 +71,7 @@ async def download_model(model_name: str) -> str:
         Success message or error
     """
     try:
-        f = modal.Function.lookup(MODAL_APP_NAME, "download_model")
+        f = _get_function("download_model")
         result = f.remote(model_name)
         
         if result["status"] == "success":
@@ -126,7 +125,7 @@ async def timbre_transfer(
             return "Error: File too large. Maximum 10MB allowed."
         
         # Call Modal function
-        f = modal.Function.lookup(MODAL_APP_NAME, "timbre_transfer")
+        f = _get_function("timbre_transfer")
         result = f.remote(
             audio_data=audio_bytes,
             model_name=model_name,
@@ -227,7 +226,7 @@ async def analyze_pitch(
         if len(audio_bytes) > 10 * 1024 * 1024:
             return json.dumps({"error": "File too large. Max 10MB."}, indent=2)
         
-        f = modal.Function.lookup(MODAL_APP_NAME, "analyze_audio")
+        f = _get_function("analyze_audio")
         result = f.remote(audio_bytes)
         
         return json.dumps(result, indent=2)
@@ -246,7 +245,7 @@ async def get_api_endpoint() -> str:
     """
     try:
         # Try to get the web endpoint
-        f = modal.Function.lookup(MODAL_APP_NAME, "api_timbre_transfer")
+        f = _get_function("api_timbre_transfer")
         # Note: Modal doesn't expose URL directly, but we can construct it
         # or the user can get it from: modal app show ddsp-timbre-transfer
         return ("API endpoint available. Run 'modal app show ddsp-timbre-transfer' "

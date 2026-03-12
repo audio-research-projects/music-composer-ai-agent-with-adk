@@ -8,28 +8,48 @@ Usage:
 import argparse
 import modal
 from pathlib import Path
-import base64
+
+APP_NAME = "ddsp-timbre-transfer"
+
+
+def get_function(name: str):
+    """Get a Modal function by name using the current API."""
+    # Use modal.Function.from_name for newer API
+    try:
+        return modal.Function.from_name(APP_NAME, name)
+    except Exception:
+        # Fallback for older versions
+        return modal.Function.lookup(APP_NAME, name)
 
 
 def test_list_models():
     """Test listing models."""
     print("\n=== Testing list_models ===")
-    f = modal.Function.lookup("ddsp-timbre-transfer", "list_models")
-    result = f.remote()
-    print(f"Available: {result.get('available_models')}")
-    print(f"Downloaded: {result.get('downloaded_models')}")
-    return result
+    try:
+        f = get_function("list_models")
+        result = f.remote()
+        print(f"Available: {result.get('available_models')}")
+        print(f"Downloaded: {result.get('downloaded_models')}")
+        return result
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        print("Make sure the app is deployed: modal deploy modal_app.py")
+        return {"available_models": [], "downloaded_models": []}
 
 
 def test_download_model(model_name: str):
     """Test downloading a model."""
     print(f"\n=== Testing download_model: {model_name} ===")
-    f = modal.Function.lookup("ddsp-timbre-transfer", "download_model")
-    result = f.remote(model_name)
-    print(f"Status: {result.get('status')}")
-    if result.get('error'):
-        print(f"Error: {result.get('error')}")
-    return result
+    try:
+        f = get_function("download_model")
+        result = f.remote(model_name)
+        print(f"Status: {result.get('status')}")
+        if result.get('error'):
+            print(f"Error: {result.get('error')}")
+        return result
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 def test_timbre_transfer(input_path: Path, model: str, output_path: Path, pitch_shift: float = 0.0):
@@ -43,28 +63,33 @@ def test_timbre_transfer(input_path: Path, model: str, output_path: Path, pitch_
     audio_bytes = input_path.read_bytes()
     print(f"Input size: {len(audio_bytes)} bytes")
     
-    # Call Modal function
-    f = modal.Function.lookup("ddsp-timbre-transfer", "timbre_transfer")
-    result = f.remote(
-        audio_data=audio_bytes,
-        model_name=model,
-        pitch_shift=pitch_shift,
-        loudness_db_shift=0.0,
-    )
-    
-    if result.get('status') == 'error':
-        print(f"❌ Error: {result.get('error')}")
-        if result.get('traceback'):
-            print(f"Traceback:\n{result.get('traceback')}")
+    try:
+        # Call Modal function
+        f = get_function("timbre_transfer")
+        result = f.remote(
+            audio_data=audio_bytes,
+            model_name=model,
+            pitch_shift=pitch_shift,
+            loudness_db_shift=0.0,
+        )
+        
+        if result.get('status') == 'error':
+            print(f"❌ Error: {result.get('error')}")
+            if result.get('traceback'):
+                print(f"Traceback:\n{result.get('traceback')}")
+            return False
+        
+        # Save output
+        output_path.write_bytes(result['output_audio'])
+        print(f"✅ Success!")
+        print(f"  Duration: {result.get('duration_seconds', 0):.2f}s")
+        print(f"  Output: {output_path}")
+        print(f"  Output size: {len(result['output_audio'])} bytes")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
         return False
-    
-    # Save output
-    output_path.write_bytes(result['output_audio'])
-    print(f"✅ Success!")
-    print(f"  Duration: {result.get('duration_seconds', 0):.2f}s")
-    print(f"  Output: {output_path}")
-    print(f"  Output size: {len(result['output_audio'])} bytes")
-    return True
 
 
 def test_analyze_audio(input_path: Path):
@@ -72,19 +97,24 @@ def test_analyze_audio(input_path: Path):
     print(f"\n=== Testing analyze_audio ===")
     
     audio_bytes = input_path.read_bytes()
-    f = modal.Function.lookup("ddsp-timbre-transfer", "analyze_audio")
-    result = f.remote(audio_bytes)
     
-    if result.get('status') == 'success':
-        print(f"✅ Analysis complete:")
-        print(f"  Duration: {result.get('duration', 0):.2f}s")
-        pitch = result.get('pitch', {})
-        print(f"  Pitch: {pitch.get('mean_hz', 0):.1f} Hz")
-        print(f"  Range: {pitch.get('min_hz', 0):.1f} - {pitch.get('max_hz', 0):.1f} Hz")
-    else:
-        print(f"❌ Error: {result.get('error')}")
-    
-    return result
+    try:
+        f = get_function("analyze_audio")
+        result = f.remote(audio_bytes)
+        
+        if result.get('status') == 'success':
+            print(f"✅ Analysis complete:")
+            print(f"  Duration: {result.get('duration', 0):.2f}s")
+            pitch = result.get('pitch', {})
+            print(f"  Pitch: {pitch.get('mean_hz', 0):.1f} Hz")
+            print(f"  Range: {pitch.get('min_hz', 0):.1f} - {pitch.get('max_hz', 0):.1f} Hz")
+        else:
+            print(f"❌ Error: {result.get('error')}")
+        
+        return result
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 def main():

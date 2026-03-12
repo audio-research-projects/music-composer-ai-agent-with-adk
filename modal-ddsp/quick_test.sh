@@ -27,11 +27,11 @@ echo "✅ App found"
 
 echo ""
 echo "2. Listing models..."
-modal run modal_app::list_models
+python3 test_transfer.py --list || modal run modal_app.py::list_models
 
 echo ""
 echo "3. Downloading violin model (if needed)..."
-modal run modal_app::download_model --model-name violin
+python3 test_transfer.py --download violin || modal run modal_app.py::download_model --model-name violin
 
 # Generate test audio if not exists
 if [ ! -f "test_input.wav" ]; then
