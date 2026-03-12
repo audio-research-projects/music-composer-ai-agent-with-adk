@@ -98,8 +98,25 @@ def download_model(model_name: str, force: bool = False) -> dict:
         urllib.request.urlretrieve(url, str(zip_path))
         
         # Extract
+        extract_dir = model_dir / "extract"
+        extract_dir.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(zip_path, 'r') as zf:
-            zf.extractall(str(model_dir))
+            zf.extractall(str(extract_dir))
+        
+        # Move files if they were extracted to a subdirectory
+        extracted_dirs = [d for d in extract_dir.iterdir() if d.is_dir()]
+        if len(extracted_dirs) == 1 and not (extract_dir / "operative_config-0.gin").exists():
+            # Files are nested, move them up
+            nested_dir = extracted_dirs[0]
+            for f in nested_dir.iterdir():
+                f.rename(model_dir / f.name)
+            nested_dir.rmdir()
+        else:
+            # Files are at root of extract dir, move them up
+            for f in extract_dir.iterdir():
+                f.rename(model_dir / f.name)
+        
+        extract_dir.rmdir()
         
         # Clean up zip
         zip_path.unlink()
