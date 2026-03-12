@@ -335,7 +335,7 @@ def analyze_audio(
     volumes={"/models": models_volume},
     gpu="T4",
 )
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def api_timbre_transfer(
     audio: bytes,
     model: str = "violin",
@@ -367,7 +367,7 @@ def api_timbre_transfer(
     image=image,
     volumes={"/models": models_volume},
 )
-@modal.web_endpoint(method="GET")
+@modal.fastapi_endpoint(method="GET")
 def api_health() -> dict:
     """Health check endpoint."""
     models = list_models.remote()
