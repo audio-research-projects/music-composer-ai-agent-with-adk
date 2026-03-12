@@ -204,9 +204,16 @@ def timbre_transfer(
         # Find checkpoint
         checkpoint = tf.train.latest_checkpoint(str(model_dir))
         if checkpoint is None:
+            # Debug: list files in model directory
+            files = []
+            if model_dir.exists():
+                for f in model_dir.rglob("*"):
+                    files.append(str(f.relative_to(model_dir)))
             return {
                 "status": "error",
-                "error": f"No checkpoint found in {model_dir}"
+                "error": f"No checkpoint found in {model_dir}",
+                "debug_files": files[:20],  # First 20 files
+                "hint": "Run 'modal run modal_app::download_model --model-name MODEL' first"
             }
         
         # Load gin config if exists
