@@ -9,7 +9,7 @@ from ..instructions import COMPOSITOR_INSTRUCTION
 
 def _on_tool_error_cut_process(
     tool: BaseTool,
-    tool_args: dict,
+    args: dict,
     context: ToolContext,
     error: Exception,
 ) -> dict:
