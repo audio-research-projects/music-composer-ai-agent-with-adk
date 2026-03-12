@@ -55,6 +55,11 @@ def sox_mcp() -> McpToolset:
     return mcp_toolset(MCP_DIR / "sox-mcp-server", "mcp_sox.py", "sox")
 
 
+def ddsp_mcp() -> McpToolset:
+    """MCP toolset for DDSP neural audio synthesis and timbre transfer."""
+    return mcp_toolset(MCP_DIR / "ddsp-mcp-server", "mcp_ddsp.py", "ddsp")
+
+
 def _mcp_env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if k in MCP_ENV_KEYS and v}
 
