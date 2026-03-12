@@ -30,9 +30,9 @@ image = (
     .pip_install(
         "ddsp>=3.6.0",
         "tensorflow>=2.10.0,<2.16",
-        "tensorflow-probability>=0.18.0",
-        "numpy>=1.23.0",
-        "scipy>=1.9.0",
+        "tensorflow-probability>=0.18.0,<0.24.0",
+        "numpy>=1.23.0,<2.0",
+        "scipy>=1.9.0,<1.14",
         "librosa>=0.9.0",
         "soundfile>=0.11.0",
         "gin-config>=0.5.0",
