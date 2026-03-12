@@ -23,21 +23,22 @@ from modal_app import (
 app = modal.App("ddsp-api")
 
 # Reuse the same image and volume from modal_app
+# Force rebuild v2 - pinned compatible versions
 image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
     .pip_install(
-        "ddsp>=3.6.0",
-        "tensorflow>=2.10.0,<2.16",
-        "tensorflow-probability>=0.18.0,<0.24.0",
-        "numpy>=1.23.0,<2.0",
-        "scipy>=1.9.0,<1.14",
-        "librosa>=0.9.0",
-        "soundfile>=0.11.0",
-        "gin-config>=0.5.0",
-        "fastapi>=0.100.0",
-        "python-multipart>=0.0.6",
-        "uvicorn>=0.23.0",
+        "tensorflow==2.11.1",
+        "tensorflow-probability==0.19.0",
+        "numpy==1.23.5",
+        "scipy==1.10.1",
+        "librosa==0.9.2",
+        "soundfile==0.12.1",
+        "ddsp==3.6.0",
+        "gin-config==0.5.0",
+        "fastapi==0.103.2",
+        "python-multipart==0.0.6",
+        "uvicorn==0.23.2",
     )
 )
 
