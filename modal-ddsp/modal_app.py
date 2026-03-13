@@ -119,11 +119,32 @@ def download_model(model_name: str, force: bool = False) -> dict:
             print(f"  - {f.relative_to(extract_dir)}")
         
         # Move files if they were extracted to a subdirectory
-        extracted_dirs = [d for d in extract_dir.iterdir() if d.is_dir()]
-        print(f"Found {len(extracted_dirs)} directories in extract folder")
+        # Filter out macOS metadata directory
+        extracted_dirs = [d for d in extract_dir.iterdir() if d.is_dir() and d.name != "__MACOSX"]
+        print(f"Found {len(extracted_dirs)} directories in extract folder (excluding __MACOSX)")
         
-        if len(extracted_dirs) == 1 and not (extract_dir / "operative_config-0.gin").exists():
-            # Files are nested, move them up
+        # Check if there's a nested directory with checkpoint files
+        model_subdir = None
+        for d in extracted_dirs:
+            if (d / "operative_config-0.gin").exists() or list(d.glob("*.ckpt*")):
+                model_subdir = d
+                break
+        
+        if model_subdir:
+            # Files are nested in a subdirectory, move them up
+            print(f"Moving files from nested dir: {model_subdir.name}")
+            for f in model_subdir.iterdir():
+                dest = model_dir / f.name
+                print(f"  Moving {f.name} -> {dest}")
+                f.rename(dest)
+            model_subdir.rmdir()
+            # Also clean up __MACOSX if present
+            macosx_dir = extract_dir / "__MACOSX"
+            if macosx_dir.exists():
+                import shutil
+                shutil.rmtree(str(macosx_dir))
+        elif len(extracted_dirs) == 1 and not (extract_dir / "operative_config-0.gin").exists():
+            # Single nested dir (fallback)
             nested_dir = extracted_dirs[0]
             print(f"Moving files from nested dir: {nested_dir.name}")
             for f in nested_dir.iterdir():
@@ -135,6 +156,8 @@ def download_model(model_name: str, force: bool = False) -> dict:
             # Files are at root of extract dir, move them up
             print(f"Moving files from extract dir to {model_dir}")
             for f in extract_dir.iterdir():
+                if f.name == "__MACOSX":
+                    continue  # Skip macOS metadata
                 dest = model_dir / f.name
                 print(f"  Moving {f.name} -> {dest}")
                 f.rename(dest)
