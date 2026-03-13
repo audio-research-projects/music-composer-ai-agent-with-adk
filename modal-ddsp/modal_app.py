@@ -323,7 +323,7 @@ def timbre_transfer(
         model.restore(checkpoint)
         
         # Prepare features
-        features = ddsp.training.metrics.compute_audio_features(audio, sample_rate=sr)
+        features = ddsp.training.metrics.compute_audio_features(audio, frame_rate=250)
         
         # Apply shifts
         if pitch_shift != 0:
