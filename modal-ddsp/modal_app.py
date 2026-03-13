@@ -17,6 +17,12 @@ from typing import Optional, BinaryIO
 import io
 import re
 
+# Import DDSP modules to register gin configurables
+# Must be imported before gin parses config
+import ddsp
+from ddsp import synths, processors, core
+from ddsp.training import decoders, preprocessing
+
 # Modal configuration
 app = modal.App("ddsp-timbre-transfer")
 
@@ -25,7 +31,7 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v9 - import correct ddsp submodules
+# Force rebuild v10 - module-level ddsp imports for gin
 image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
@@ -313,25 +319,14 @@ def timbre_transfer(
         gin_file = model_dir / "operative_config-0.gin"
         if gin_file.exists():
             import gin
-            
-            # Import all ddsp submodules to register gin configurables
-            # Import order matters - import from specific to general
-            from ddsp import synths  # Additive, FilteredNoise
-            from ddsp.training import decoders  # RnnFcDecoder
-            from ddsp.training import preprocessing  # F0LoudnessPreprocessor
-            from ddsp import processors  # ProcessorGroup, Add
-            from ddsp import core  # scale functions
-            
             config_text = gin_file.read_text()
             
-            # Remove problematic parameters with regex
-            # These params exist in newer DDSP but not in our pinned version
+            # Remove problematic parameters and references
+            # These exist in newer DDSP but not in our pinned version
             removals = [
                 r'FilteredNoise\.noise_fade_fn\s*=\s*[^\n]+\n',
-                r'SpectralLoss\.delta_delta_freq_weight\s*=\s*[^\n]+\n', 
-                r'SpectralLoss\.delta_delta_time_weight\s*=\s*[^\n]+\n',
-                r'SpectralLoss\.delta_freq_weight\s*=\s*[^\n]+\n',
-                r'SpectralLoss\.delta_time_weight\s*=\s*[^\n]+\n',
+                r'SpectralLoss\.[^\n]+\n',  # Remove all SpectralLoss references
+                r'Autoencoder\.losses\s*=\s*[^\n]+\n',  # Remove losses from autoencoder
             ]
             
             for pattern in removals:
