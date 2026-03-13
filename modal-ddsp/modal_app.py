@@ -22,20 +22,20 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v13 - manual model construction
+# Force rebuild v17 - use working ddsp 3.6.0
 image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
     .pip_install(
         "tensorflow==2.11.1",
         "tensorflow-probability==0.19.0",
-        "numpy==1.23.5",
-        "scipy==1.10.1",
-        "librosa==0.9.2",
-        "soundfile==0.12.1",
-        "ddsp==3.2.0",  # Older version compatible with pretrained models
-        "fastapi==0.103.2",
-        "python-multipart==0.0.6",
+        "numpy<2.0",
+        "scipy<1.11",
+        "librosa<0.11",
+        "soundfile",
+        "ddsp==3.6.0",  # Working version from before
+        "fastapi",
+        "python-multipart",
     )
 )
 
@@ -172,7 +172,7 @@ def download_model(model_name: str, force: bool = False) -> dict:
     image=image,
     volumes={"/models": models_volume},
     gpu="T4",
-    timeout=120,
+    timeout=300,  # Increased timeout for cold start
 )
 def timbre_transfer(
     audio_data: bytes,
@@ -286,7 +286,7 @@ def list_models() -> dict:
     }
 
 
-@app.local_entrypoint
+@app.local_entrypoint()
 def main():
     """CLI entry point for testing."""
     import sys
