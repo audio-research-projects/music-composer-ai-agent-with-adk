@@ -263,6 +263,14 @@ def timbre_transfer(
             "error": f"Model '{model_name}' not found. Run download_model first."
         }
     
+    # Clean up leftover directories from previous extractions
+    for leftover in ["__MACOSX", f"solo_{model_name}_ckpt"]:
+        leftover_path = model_dir / leftover
+        if leftover_path.exists():
+            import shutil
+            print(f"Cleaning up leftover directory: {leftover}")
+            shutil.rmtree(str(leftover_path))
+    
     try:
         # Load audio from bytes
         audio, sr = librosa.load(io.BytesIO(audio_data), sr=sample_rate, mono=True)
@@ -276,12 +284,22 @@ def timbre_transfer(
         
         # Find checkpoint
         checkpoint = tf.train.latest_checkpoint(str(model_dir))
+        
+        # If no checkpoint file, look for .index files directly
+        if checkpoint is None:
+            index_files = list(model_dir.glob("*.index"))
+            if index_files:
+                # Use the first (or highest numbered) checkpoint
+                checkpoint = str(index_files[0]).replace(".index", "")
+                print(f"Found checkpoint directly: {checkpoint}")
+        
         if checkpoint is None:
             # Debug: list files in model directory
             files = []
             if model_dir.exists():
                 for f in model_dir.rglob("*"):
-                    files.append(str(f.relative_to(model_dir)))
+                    if f.is_file():
+                        files.append(str(f.relative_to(model_dir)))
             return {
                 "status": "error",
                 "error": f"No checkpoint found in {model_dir}",
