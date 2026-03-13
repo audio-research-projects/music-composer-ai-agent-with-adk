@@ -25,7 +25,7 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v6 - regex-based gin config filtering
+# Force rebuild v7 - map DefaultPreprocessor to F0LoudnessPreprocessor
 image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
@@ -308,8 +308,8 @@ def timbre_transfer(
                 "hint": "Run 'modal run modal_app::download_model --model-name MODEL' first"
             }
         
-        # Parse gin config but skip incompatible parameters
-        # Models were trained with newer DDSP, some params don't exist in our version
+        # Parse gin config but fix incompatible class names and parameters
+        # Models were trained with newer DDSP, need mapping for compatibility
         gin_file = model_dir / "operative_config-0.gin"
         if gin_file.exists():
             import gin
@@ -328,8 +328,11 @@ def timbre_transfer(
             for pattern in removals:
                 config_text = re.sub(pattern, '', config_text)
             
-            # Fix ambiguous Add reference
+            # Fix ambiguous Add reference  
             config_text = re.sub(r'(?<![\w.])Add\.', 'ddsp.processors.Add.', config_text)
+            
+            # Fix DefaultPreprocessor -> F0LoudnessPreprocessor (renamed in newer DDSP)
+            config_text = config_text.replace('DefaultPreprocessor', 'F0LoudnessPreprocessor')
             
             with gin.unlock_config():
                 gin.parse_config(config_text, skip_unknown=True)
