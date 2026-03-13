@@ -25,7 +25,7 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v3 - fixed compute_audio_features call
+# Force rebuild v4 - fixed gin config filtering
 image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
@@ -321,13 +321,14 @@ def timbre_transfer(
             ]
             
             for line in config_lines:
+                stripped = line.strip()
+                
                 # Skip lines with problematic parameters
-                if any(pattern in line for pattern in skip_patterns):
-                    print(f"  Skipping incompatible config: {line.strip()[:60]}...")
+                if any(pattern in stripped for pattern in skip_patterns):
+                    print(f"  Skipping incompatible config: {stripped[:60]}...")
                     continue
                 
                 # Fix ambiguous 'Add' reference
-                import re
                 line = re.sub(r'(?<![\w.])Add\.', 'ddsp.processors.Add.', line)
                 
                 filtered_lines.append(line)
