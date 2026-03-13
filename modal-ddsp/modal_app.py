@@ -57,20 +57,33 @@ KNOWN_MODELS = {
 }
 
 
-def build_ddsp_model():
-    """Build DDSP autoencoder model manually.
+def build_ddsp_model(duration_seconds: float = 4.0):
+    """Build DDSP autoencoder model manually with configurable duration.
     
     Based on the architecture from solo_violin_ckpt operative_config-0.gin
+    
+    Args:
+        duration_seconds: Length of audio to process (default 4.0, can go up to ~15-20s on T4)
     """
     import tensorflow as tf
     from ddsp import synths, processors, core
     from ddsp.training import preprocessing, decoders, models
     
+    sample_rate = 16000
+    frame_rate = 250
+    
+    # Calculate parameters based on duration
+    n_samples = int(sample_rate * duration_seconds)
+    time_steps = int(frame_rate * duration_seconds)
+    
+    print(f"Building model for {duration_seconds}s audio:")
+    print(f"  n_samples: {n_samples}, time_steps: {time_steps}")
+    
     # Preprocessor: F0LoudnessPreprocessor
     preprocessor = preprocessing.F0LoudnessPreprocessor(
-        time_steps=1000,
-        frame_rate=250,
-        sample_rate=16000,
+        time_steps=time_steps,
+        frame_rate=frame_rate,
+        sample_rate=sample_rate,
         compute_loudness=True,
     )
     
@@ -89,16 +102,16 @@ def build_ddsp_model():
         ),
     )
     
-    # Processor group: Harmonic + FilteredNoise + Add + Reverb
+    # Processor group: Harmonic + FilteredNoise + Add
     harmonic = synths.Harmonic(
-        n_samples=64000,
-        sample_rate=16000,
+        n_samples=n_samples,
+        sample_rate=sample_rate,
         scale_fn=core.exp_sigmoid,
         normalize_below_nyquist=True,
     )
     
     filtered_noise = synths.FilteredNoise(
-        n_samples=64000,
+        n_samples=n_samples,
         scale_fn=core.exp_sigmoid,
         initial_bias=-5.0,
     )
@@ -254,9 +267,9 @@ def timbre_transfer(
                 return {"status": "error", "error": "No checkpoint found"}
         print(f"Checkpoint: {checkpoint}")
         
-        # Build model
+        # Build model with audio duration
         print("Building model...")
-        model = build_ddsp_model()
+        model = build_ddsp_model(duration_seconds=duration)
         print("Model built, restoring weights...")
         
         # Restore weights
