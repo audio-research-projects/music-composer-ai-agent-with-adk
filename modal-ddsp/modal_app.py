@@ -22,16 +22,20 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v18 - gsutil and GPU verification
+# Force rebuild v20 - CUDA base image with proper setup
 image = (
-    modal.Image.debian_slim(python_version="3.10")
-    .apt_install("libsndfile1", "ffmpeg", "wget", "unzip", "curl", "gnupg")
+    modal.Image.from_registry(
+        "nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04",
+        add_python="3.10"
+    )
+    .apt_install("libsndfile1", "ffmpeg", "wget", "unzip", "curl", "gnupg", "git")
     # Install Google Cloud SDK for gsutil
     .run_commands(
         "echo 'deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main' | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list",
         "curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -",
         "apt-get update && apt-get install -y google-cloud-sdk",
     )
+    .pip_install("setuptools<58", "wheel")  # For crepe compatibility
     .pip_install(
         "tensorflow==2.11.1",
         "tensorflow-probability==0.19.0",
@@ -39,10 +43,10 @@ image = (
         "scipy<1.11",
         "librosa<0.11",
         "soundfile",
-        "ddsp==3.6.0",
-        "fastapi",
-        "python-multipart",
     )
+    # Install crepe separately with no build isolation
+    .run_commands("pip install crepe==0.0.12 --no-build-isolation")
+    .pip_install("ddsp==3.6.0", "fastapi", "python-multipart")
 )
 
 # Known pre-trained model URLs from Google Magenta
@@ -221,6 +225,8 @@ def timbre_transfer(
         return {"status": "error", "error": f"Model '{model_name}' not found"}
     
     try:
+        import numpy as np
+        
         # Verify GPU availability
         print(f"TensorFlow version: {tf.__version__}")
         print(f"CUDA available: {tf.test.is_built_with_cuda()}")
@@ -273,8 +279,13 @@ def timbre_transfer(
         print("Running inference...")
         outputs = model(features, training=False)
         print(f"Outputs: {list(outputs.keys())}")
-        audio_gen = outputs['audio_synth'].numpy()
-        print(f"Generated audio shape: {audio_gen.shape}")
+        audio_gen = outputs['audio_synth']
+        # Convert to numpy if it's a tensor
+        if hasattr(audio_gen, 'numpy'):
+            audio_gen = audio_gen.numpy()
+        # Ensure it's 1D array
+        audio_gen = np.squeeze(audio_gen)
+        print(f"Generated audio shape: {audio_gen.shape}, dtype: {audio_gen.dtype}")
         
         # Convert to bytes
         output_buffer = io.BytesIO()
@@ -305,6 +316,43 @@ def timbre_transfer(
             "error": str(e),
             "traceback": traceback.format_exc()
         }
+
+
+@app.function(
+    image=image,
+    volumes={"/models": models_volume},
+    gpu="T4",
+    timeout=60,
+)
+def gpu_check() -> dict:
+    """Check GPU availability and TensorFlow configuration."""
+    import tensorflow as tf
+    import os
+    
+    # Check CUDA_VISIBLE_DEVICES
+    cuda_devices = os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set')
+    
+    # Check TensorFlow GPU
+    gpus = tf.config.list_physical_devices('GPU')
+    
+    # Check if built with CUDA
+    built_with_cuda = tf.test.is_built_with_cuda()
+    
+    # Try to get GPU info
+    gpu_info = []
+    for gpu in gpus:
+        gpu_info.append({
+            "name": gpu.name,
+            "type": gpu.device_type,
+        })
+    
+    return {
+        "tensorflow_version": tf.__version__,
+        "cuda_visible_devices": cuda_devices,
+        "built_with_cuda": built_with_cuda,
+        "gpus_found": len(gpus),
+        "gpu_info": gpu_info,
+    }
 
 
 @app.function(
