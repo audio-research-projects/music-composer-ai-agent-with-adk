@@ -25,7 +25,7 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v4 - fixed gin config filtering
+# Force rebuild v5 - more gin config filtering
 image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
@@ -318,6 +318,10 @@ def timbre_transfer(
             
             skip_patterns = [
                 'noise_fade_fn',  # Parameter doesn't exist in this DDSP version
+                'delta_delta_freq_weight',  # SpectralLoss parameter not in this version
+                'delta_delta_time_weight',
+                'delta_freq_weight', 
+                'delta_time_weight',
             ]
             
             for line in config_lines:
