@@ -23,11 +23,6 @@ import ddsp
 from ddsp import synths, processors, core
 from ddsp.training import decoders, preprocessing
 
-# Debug: check if synths.Additive is registered
-import gin
-print("DDSP imported")
-print(f"Additive class exists: {hasattr(synths, 'Additive')}")
-
 # Modal configuration
 app = modal.App("ddsp-timbre-transfer")
 
@@ -36,7 +31,7 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v10 - module-level ddsp imports for gin
+# Force rebuild v11 - fully qualified gin module paths
 image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
@@ -342,6 +337,13 @@ def timbre_transfer(
             
             # Fix DefaultPreprocessor -> F0LoudnessPreprocessor (renamed in newer DDSP)
             config_text = config_text.replace('DefaultPreprocessor', 'F0LoudnessPreprocessor')
+            
+            # Fix module references to be fully qualified for gin
+            config_text = config_text.replace('@synths.', '@ddsp.synths.')
+            config_text = config_text.replace('@decoders.', '@ddsp.training.decoders.')
+            config_text = config_text.replace('@processors.', '@ddsp.processors.')
+            config_text = config_text.replace('@core.', '@ddsp.core.')
+            config_text = config_text.replace('@preprocessing.', '@ddsp.training.preprocessing.')
             
             with gin.unlock_config():
                 gin.parse_config(config_text, skip_unknown=True)
