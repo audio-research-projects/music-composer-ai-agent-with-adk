@@ -25,7 +25,7 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v8 - import gin-referenced modules
+# Force rebuild v9 - import correct ddsp submodules
 image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
@@ -313,14 +313,14 @@ def timbre_transfer(
         gin_file = model_dir / "operative_config-0.gin"
         if gin_file.exists():
             import gin
-            # Import modules referenced in gin config so they're registered
-            import ddsp.synths  # For Additive, FilteredNoise
-            import ddsp.training.decoders  # For RnnFcDecoder
-            import ddsp.training.losses  # For SpectralLoss
-            import ddsp.training.processors  # For ProcessorGroup
-            import ddsp.training.nn  # For DictLayer base classes
-            import ddsp.training.preprocessing  # For F0LoudnessPreprocessor
-            import ddsp.core  # For core functions
+            
+            # Import all ddsp submodules to register gin configurables
+            # Import order matters - import from specific to general
+            from ddsp import synths  # Additive, FilteredNoise
+            from ddsp.training import decoders  # RnnFcDecoder
+            from ddsp.training import preprocessing  # F0LoudnessPreprocessor
+            from ddsp import processors  # ProcessorGroup, Add
+            from ddsp import core  # scale functions
             
             config_text = gin_file.read_text()
             
