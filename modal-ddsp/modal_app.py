@@ -43,12 +43,15 @@ image = (
 )
 
 # Known pre-trained model URLs from Google Magenta
+# Note: Models are in /models/ directory, not root
 KNOWN_MODELS = {
-    "violin": "https://storage.googleapis.com/ddsp/models/violin.zip",
-    "flute": "https://storage.googleapis.com/ddsp/models/flute.zip",
-    "tenor_sax": "https://storage.googleapis.com/ddsp/models/tenor_sax.zip",
-    "trumpet": "https://storage.googleapis.com/ddsp/models/trumpet.zip",
-    "flute2": "https://storage.googleapis.com/ddsp/models/flute2.zip",
+    "violin": "https://storage.googleapis.com/ddsp/models/solo_violin_ckpt.zip",
+    "flute": "https://storage.googleapis.com/ddsp/models/solo_flute_ckpt.zip",
+    "flute2": "https://storage.googleapis.com/ddsp/models/solo_flute2_ckpt.zip",
+    # Additional models available:
+    # "tenor_sax": "https://storage.googleapis.com/ddsp/models/solo_tenor_saxophone_ckpt.zip",
+    # "trumpet": "https://storage.googleapis.com/ddsp/models/solo_trumpet_ckpt.zip",
+    # "saxophone": "https://storage.googleapis.com/ddsp/models/solo_saxophone_ckpt.zip",
 }
 
 
