@@ -23,6 +23,13 @@ import ddsp
 from ddsp import synths, processors, core
 from ddsp.training import decoders, preprocessing
 
+# Debug: check if synths.Additive is registered
+import gin
+print(f"  DDSP version: {ddsp.__version__ if hasattr(ddsp, '__version__') else 'unknown'}")
+print(f"  Synths module: {synths}")
+print(f"  Additive class: {hasattr(synths, 'Additive')}")
+print(f"  Available gin configurables: {list(gin.config._REGISTRY._selector_map.keys())[:20]}..."
+
 # Modal configuration
 app = modal.App("ddsp-timbre-transfer")
 
