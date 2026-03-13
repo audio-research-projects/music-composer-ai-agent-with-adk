@@ -17,12 +17,6 @@ from typing import Optional, BinaryIO
 import io
 import re
 
-# Import DDSP modules to register gin configurables
-# Must be imported before gin parses config
-import ddsp
-from ddsp import synths, processors, core
-from ddsp.training import decoders, preprocessing
-
 # Modal configuration
 app = modal.App("ddsp-timbre-transfer")
 
@@ -31,7 +25,7 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v11 - fully qualified gin module paths
+# Force rebuild v12 - imports inside function
 image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
@@ -319,6 +313,12 @@ def timbre_transfer(
         gin_file = model_dir / "operative_config-0.gin"
         if gin_file.exists():
             import gin
+            
+            # Import modules to register gin configurables
+            # Must be done before parsing gin config
+            from ddsp import synths, processors, core
+            from ddsp.training import decoders, preprocessing
+            
             config_text = gin_file.read_text()
             
             # Remove problematic parameters and references
