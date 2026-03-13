@@ -22,10 +22,16 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v17 - use working ddsp 3.6.0
+# Force rebuild v18 - gsutil and GPU verification
 image = (
     modal.Image.debian_slim(python_version="3.10")
-    .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
+    .apt_install("libsndfile1", "ffmpeg", "wget", "unzip", "curl", "gnupg")
+    # Install Google Cloud SDK for gsutil
+    .run_commands(
+        "echo 'deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main' | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list",
+        "curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -",
+        "apt-get update && apt-get install -y google-cloud-sdk",
+    )
     .pip_install(
         "tensorflow==2.11.1",
         "tensorflow-probability==0.19.0",
@@ -33,7 +39,7 @@ image = (
         "scipy<1.11",
         "librosa<0.11",
         "soundfile",
-        "ddsp==3.6.0",  # Working version from before
+        "ddsp==3.6.0",
         "fastapi",
         "python-multipart",
     )
@@ -122,8 +128,8 @@ def build_ddsp_model():
     timeout=300,
 )
 def download_model(model_name: str, force: bool = False) -> dict:
-    """Download a pre-trained DDSP model."""
-    import urllib.request
+    """Download a pre-trained DDSP model using gsutil."""
+    import subprocess
     import zipfile
     import os
     
@@ -139,11 +145,31 @@ def download_model(model_name: str, force: bool = False) -> dict:
         return {"status": "exists", "model_name": model_name}
     
     model_dir.mkdir(parents=True, exist_ok=True)
-    url = KNOWN_MODELS[model_name]
     
-    # Download
+    # Extract bucket path from URL
+    url = KNOWN_MODELS[model_name]
+    # URL format: https://storage.googleapis.com/ddsp/models/solo_{model}_ckpt.zip
+    # gsutil format: gs://ddsp/models/solo_{model}_ckpt.zip
+    gs_path = url.replace("https://storage.googleapis.com/", "gs://")
+    
+    print(f"Downloading {model_name} from {gs_path}...")
+    
+    # Download using gsutil
     zip_path = model_dir / "model.zip"
-    urllib.request.urlretrieve(url, zip_path)
+    result = subprocess.run(
+        ["gsutil", "cp", gs_path, str(zip_path)],
+        capture_output=True,
+        text=True
+    )
+    
+    if result.returncode != 0:
+        return {
+            "status": "error",
+            "error": f"gsutil failed: {result.stderr}",
+            "stdout": result.stdout,
+        }
+    
+    print(f"Downloaded to {zip_path}, extracting...")
     
     # Extract
     with zipfile.ZipFile(zip_path, 'r') as zf:
@@ -165,6 +191,7 @@ def download_model(model_name: str, force: bool = False) -> dict:
     
     zip_path.unlink()
     
+    print(f"Model {model_name} ready at {model_dir}")
     return {"status": "downloaded", "model_name": model_name}
 
 
@@ -194,14 +221,23 @@ def timbre_transfer(
         return {"status": "error", "error": f"Model '{model_name}' not found"}
     
     try:
+        # Verify GPU availability
+        print(f"TensorFlow version: {tf.__version__}")
+        print(f"CUDA available: {tf.test.is_built_with_cuda()}")
+        gpus = tf.config.list_physical_devices('GPU')
+        print(f"GPUs: {gpus}")
+        
         # Load audio
+        print("Loading audio...")
         audio, sr = librosa.load(io.BytesIO(audio_data), sr=sample_rate, mono=True)
         duration = len(audio) / sr
+        print(f"Audio loaded: {duration:.2f}s, {len(audio)} samples")
         
         if duration > 60:
             return {"status": "error", "error": "Audio too long (max 60 seconds)"}
         
         # Find checkpoint
+        print("Finding checkpoint...")
         checkpoint = tf.train.latest_checkpoint(str(model_dir))
         if checkpoint is None:
             # Fallback: look for .index files
@@ -210,16 +246,22 @@ def timbre_transfer(
                 checkpoint = str(index_files[0]).replace(".index", "")
             else:
                 return {"status": "error", "error": "No checkpoint found"}
+        print(f"Checkpoint: {checkpoint}")
         
         # Build model
+        print("Building model...")
         model = build_ddsp_model()
+        print("Model built, restoring weights...")
         
         # Restore weights
-        model.restore(checkpoint, verbose=False)
+        model.restore(checkpoint, verbose=True)
+        print("Weights restored")
         
         # Prepare features using DDSP's metrics
+        print("Computing audio features...")
         from ddsp.training import metrics
         features = metrics.compute_audio_features(audio)
+        print(f"Features computed: {list(features.keys())}")
         
         # Apply shifts
         if pitch_shift != 0:
@@ -228,13 +270,17 @@ def timbre_transfer(
             features['loudness_db'] = features['loudness_db'] + loudness_db_shift
         
         # Run inference
+        print("Running inference...")
         outputs = model(features, training=False)
+        print(f"Outputs: {list(outputs.keys())}")
         audio_gen = outputs['audio_synth'].numpy()
+        print(f"Generated audio shape: {audio_gen.shape}")
         
         # Convert to bytes
         output_buffer = io.BytesIO()
         sf.write(output_buffer, audio_gen, sr, format='WAV')
         output_bytes = output_buffer.getvalue()
+        print(f"Output audio: {len(output_bytes)} bytes")
         
         # Cleanup
         del model, outputs
