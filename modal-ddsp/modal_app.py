@@ -307,11 +307,16 @@ def timbre_transfer(
                 "hint": "Run 'modal run modal_app::download_model --model-name MODEL' first"
             }
         
-        # Load gin config if exists
+        # Load gin config if exists (optional, model can work without it)
         gin_file = model_dir / "operative_config-0.gin"
         if gin_file.exists():
-            import gin
-            gin.parse_config_file(str(gin_file))
+            try:
+                import gin
+                gin.parse_config_file(str(gin_file), skip_unknown=True)
+                print(f"  Loaded gin config: {gin_file}")
+            except Exception as e:
+                print(f"  Warning: Could not load gin config: {e}")
+                print("  Continuing without gin config...")
         
         # Create and restore model
         model = ddsp.training.models.Autoencoder()
