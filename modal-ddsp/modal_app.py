@@ -24,7 +24,7 @@ app = modal.App("ddsp-timbre-transfer")
 models_volume = modal.Volume.from_name("ddsp-models", create_if_missing=True)
 
 # Container image with DDSP and dependencies
-# Force rebuild v2 - pinned compatible versions
+# Force rebuild v3 - fixed compute_audio_features call
 image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("libsndfile1", "ffmpeg", "wget", "unzip")
