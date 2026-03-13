@@ -308,17 +308,31 @@ def timbre_transfer(
                 "hint": "Run 'modal run modal_app::download_model --model-name MODEL' first"
             }
         
-        # Fix gin config ambiguity by preprocessing the config file
+        # Fix gin config issues by preprocessing the config file
         gin_file = model_dir / "operative_config-0.gin"
         if gin_file.exists():
             import gin
-            # Read and fix ambiguous selectors
-            config_text = gin_file.read_text()
-            # Replace ambiguous 'Add' with fully qualified 'ddsp.processors.Add'
-            # But be careful not to replace already qualified references
-            import re
-            # Replace 'Add.' with 'ddsp.processors.Add.' when not preceded by a dot or word char
-            config_text = re.sub(r'(?<![\w.])Add\.', 'ddsp.processors.Add.', config_text)
+            # Read and fix config issues
+            config_lines = gin_file.read_text().split('\n')
+            filtered_lines = []
+            
+            skip_patterns = [
+                'noise_fade_fn',  # Parameter doesn't exist in this DDSP version
+            ]
+            
+            for line in config_lines:
+                # Skip lines with problematic parameters
+                if any(pattern in line for pattern in skip_patterns):
+                    print(f"  Skipping incompatible config: {line.strip()[:60]}...")
+                    continue
+                
+                # Fix ambiguous 'Add' reference
+                import re
+                line = re.sub(r'(?<![\w.])Add\.', 'ddsp.processors.Add.', line)
+                
+                filtered_lines.append(line)
+            
+            config_text = '\n'.join(filtered_lines)
             
             with gin.unlock_config():
                 gin.parse_config(config_text, skip_unknown=True)
