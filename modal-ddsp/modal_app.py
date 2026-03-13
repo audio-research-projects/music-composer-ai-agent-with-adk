@@ -15,6 +15,7 @@ import modal
 from pathlib import Path
 from typing import Optional, BinaryIO
 import io
+import re
 
 # Modal configuration
 app = modal.App("ddsp-timbre-transfer")
@@ -307,14 +308,25 @@ def timbre_transfer(
                 "hint": "Run 'modal run modal_app::download_model --model-name MODEL' first"
             }
         
-        # Use DDSP's AutoencoderInference which handles gin parsing properly
-        import ddsp.training.inference as inference
-        model = inference.AutoencoderInference(
-            ckpt=str(model_dir),
-            length_seconds=min(duration, 10.0),  # Max 10 seconds for inference
-            remove_reverb=False,  # Keep reverb for richer sound
-            verbose=False
-        )
+        # Fix gin config ambiguity by preprocessing the config file
+        gin_file = model_dir / "operative_config-0.gin"
+        if gin_file.exists():
+            import gin
+            # Read and fix ambiguous selectors
+            config_text = gin_file.read_text()
+            # Replace ambiguous 'Add' with fully qualified 'ddsp.processors.Add'
+            # But be careful not to replace already qualified references
+            import re
+            # Replace 'Add.' with 'ddsp.processors.Add.' when not preceded by a dot or word char
+            config_text = re.sub(r'(?<![\w.])Add\.', 'ddsp.processors.Add.', config_text)
+            
+            with gin.unlock_config():
+                gin.parse_config(config_text, skip_unknown=True)
+                print(f"  Loaded and fixed gin config")
+        
+        # Create and restore model
+        model = ddsp.training.models.Autoencoder()
+        model.restore(checkpoint, verbose=False)
         
         # Prepare features
         features = ddsp.training.metrics.compute_audio_features(audio, frame_rate=250)
