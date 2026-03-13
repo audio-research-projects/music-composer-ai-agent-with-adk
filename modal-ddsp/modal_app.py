@@ -310,7 +310,8 @@ def timbre_transfer(
         # Load gin config if exists
         gin_file = model_dir / "operative_config-0.gin"
         if gin_file.exists():
-            ddsp.training.metrics.gin_parse(str(gin_file))
+            import gin
+            gin.parse_config_file(str(gin_file))
         
         # Create and restore model
         model = ddsp.training.models.Autoencoder()
