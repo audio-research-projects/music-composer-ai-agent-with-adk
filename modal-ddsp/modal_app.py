@@ -92,50 +92,80 @@ def download_model(model_name: str, force: bool = False) -> dict:
     model_dir.mkdir(parents=True, exist_ok=True)
     url = KNOWN_MODELS[model_name]
     
+    files_before = list(model_dir.iterdir()) if model_dir.exists() else []
+    
     try:
         # Download to temp file
         zip_path = model_dir / "model.zip"
+        print(f"Downloading {url} to {zip_path}...")
         urllib.request.urlretrieve(url, str(zip_path))
+        zip_size = zip_path.stat().st_size
+        print(f"Downloaded {zip_size} bytes")
         
         # Extract
         extract_dir = model_dir / "extract"
         extract_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Extracting to {extract_dir}...")
         with zipfile.ZipFile(zip_path, 'r') as zf:
             zf.extractall(str(extract_dir))
         
+        # Show what was extracted
+        extracted_files = list(extract_dir.rglob("*"))
+        print(f"Extracted {len(extracted_files)} items")
+        for f in extracted_files[:10]:  # Show first 10
+            print(f"  - {f.relative_to(extract_dir)}")
+        
         # Move files if they were extracted to a subdirectory
         extracted_dirs = [d for d in extract_dir.iterdir() if d.is_dir()]
+        print(f"Found {len(extracted_dirs)} directories in extract folder")
+        
         if len(extracted_dirs) == 1 and not (extract_dir / "operative_config-0.gin").exists():
             # Files are nested, move them up
             nested_dir = extracted_dirs[0]
+            print(f"Moving files from nested dir: {nested_dir.name}")
             for f in nested_dir.iterdir():
-                f.rename(model_dir / f.name)
+                dest = model_dir / f.name
+                print(f"  Moving {f.name} -> {dest}")
+                f.rename(dest)
             nested_dir.rmdir()
         else:
             # Files are at root of extract dir, move them up
+            print(f"Moving files from extract dir to {model_dir}")
             for f in extract_dir.iterdir():
-                f.rename(model_dir / f.name)
+                dest = model_dir / f.name
+                print(f"  Moving {f.name} -> {dest}")
+                f.rename(dest)
         
         extract_dir.rmdir()
         
         # Clean up zip
         zip_path.unlink()
         
+        # Show final files before commit
+        final_files = list(model_dir.iterdir())
+        print(f"Files in {model_dir} before commit: {[f.name for f in final_files]}")
+        
         # Commit to volume
+        print("Committing to volume...")
         models_volume.commit()
         
         return {
             "status": "success",
             "model_name": model_name,
             "path": str(model_dir),
-            "url": url
+            "url": url,
+            "zip_size": zip_size,
+            "files": [f.name for f in final_files],
         }
         
     except Exception as e:
+        import traceback
         return {
             "status": "error",
             "model_name": model_name,
-            "error": str(e)
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "files_before": [f.name for f in files_before],
         }
 
 
